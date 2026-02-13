@@ -644,6 +644,48 @@ async def start_vote(channel: discord.TextChannel, guild: discord.Guild):
 # -----------------------
 # DM Commands (Night abilities)
 # -----------------------
+
+def find_game_for_host(host_id: int) -> Optional[Game]:
+    for game in games.values():
+        if game.started and game.host_id == host_id:
+            return game
+    return None
+
+def _night_step_applicable(g: Game, step: int) -> bool:
+    # 1: Matchmaker (Night 1 only)
+    if step == 1:
+        if g.night_num != 1 or g.matchmaker_used:
+            return False
+        return any(uid in g.alive and g.roles.get(uid) == MATCHMAKER for uid in g.players)
+    # 2: Doctor
+    if step == 2:
+        return any(uid in g.alive and g.roles.get(uid) == DOCTOR for uid in g.players)
+    # 3: Lawyer
+    if step == 3:
+        return any(uid in g.alive and g.roles.get(uid) == LAWYER for uid in g.players)
+    # 4: Detective
+    if step == 4:
+        return any(uid in g.alive and g.roles.get(uid) == DETECTIVE for uid in g.players)
+    # 5: Stoic Omega (every other night)
+    if step == 5:
+        if not omega_can_act_this_night(g):
+            return False
+        return any(uid in g.alive and g.roles.get(uid) == STOIC_OMEGA for uid in g.players)
+    # 6: Needy Beta
+    if step == 6:
+        return any(uid in g.alive and g.roles.get(uid) == NEEDY_BETA for uid in g.players)
+    # 7: Wolves
+    if step == 7:
+        return len(g.wolves_alive()) > 0
+    return True
+
+def next_night_step(g: Game) -> int:
+    step = max(0, g.night_step)
+    for s in range(step + 1, 8):
+        if _night_step_applicable(g, s):
+            return s
+    return 7
+
 def find_game_for_user(uid: int) -> Optional[Game]:
     for game in games.values():
         if uid in game.players and game.started:
@@ -670,6 +712,77 @@ async def host_roles(ctx: commands.Context):
         return await ctx.send("Could not resolve guild/channel.")
     role_lines = [f"<@{uid}> — {g.roles.get(uid, 'unknown')}" for uid in g.players]
     await ctx.send("📋 **Host Role List** (keep secret!)\n" + "\n".join(role_lines))
+
+
+@bot.command()
+async def status(ctx: commands.Context):
+    """Host-only (DM): show current game status and which night actions are in."""
+    if ctx.guild is not None:
+        return
+    g = find_game_for_host(ctx.author.id)
+    if not g:
+        return await ctx.send("No active game found where you are the host.")
+    channel, guild = _resolve_channel_and_guild(g)
+    if not channel or not guild:
+        return await ctx.send("Could not resolve guild/channel.")
+
+    wolves = g.wolves_alive()
+    lines = []
+    lines.append(f"🧭 **Status** — Phase: **{g.phase.upper()}** | Night: **{g.night_num}** | Night step: **{g.night_step}**")
+    lines.append(f"🧑‍🤝‍🧑 Alive: **{len(g.alive)}/{len(g.players)}** | Wolves: **{len(wolves)}** | Villagers: **{len(g.villagers_alive())}**")
+
+    if g.phase == "night":
+        if g.night_num == 1 and any(g.roles.get(u)==MATCHMAKER for u in g.players):
+            lines.append(f"💘 Lovers set: **{'Yes' if g.lovers else 'No'}**")
+        if any(g.roles.get(u)==DOCTOR for u in g.players):
+            dt = f"<@{g.doctor_target}>" if g.doctor_target else "(none)"
+            lines.append(f"🩻 Doctor target: {dt}")
+        if any(g.roles.get(u)==LAWYER for u in g.players):
+            lt = f"<@{g.lawyer_target}>" if g.lawyer_target else "(none)"
+            lines.append(f"⚖️ Lawyer defend: {lt}")
+        if any(g.roles.get(u)==DETECTIVE for u in g.players):
+            it = f"<@{g.detective_target}>" if g.detective_target else "(none)"
+            lines.append(f"🔎 Detective investigate: {it}")
+        if any(g.roles.get(u)==STOIC_OMEGA for u in g.players):
+            ot = f"<@{g.omega_nullify_target}>" if g.omega_nullify_target else "(none)"
+            lines.append(f"😼 Omega nullify: {ot} (can act tonight: {'Yes' if omega_can_act_this_night(g) else 'No'})")
+        if any(g.roles.get(u)==NEEDY_BETA for u in g.players):
+            nt = f"<@{g.needy_mark_target}>" if g.needy_mark_target else "(none)"
+            lines.append(f"🙏 Needy mark: {nt}")
+        lines.append(f"🐺 Wolf votes: **{len(g.wolf_votes)}/{len(wolves)}**")
+
+    if g.phase == "vote":
+        lines.append(f"🗳️ Day votes received: **{len(g.day_votes)}**")
+
+    await ctx.send("\n".join(lines))
+
+@bot.command()
+async def next(ctx: commands.Context):
+    """Host-only (DM): advance to the next applicable night phase."""
+    if ctx.guild is not None:
+        return
+    g = find_game_for_host(ctx.author.id)
+    if not g or ctx.author.id != g.host_id:
+        return await ctx.send("Host-only DM command.")
+    if g.phase != "night":
+        return await ctx.send("`!next` is for **night phases**. Use `!vote_start` / `!vote_end` for day.")
+    step = next_night_step(g)
+    return await _host_run_phase(ctx, step)
+
+@bot.command()
+async def skip(ctx: commands.Context):
+    """Host-only (DM): skip the current night phase and jump to the next one."""
+    if ctx.guild is not None:
+        return
+    g = find_game_for_host(ctx.author.id)
+    if not g or ctx.author.id != g.host_id:
+        return await ctx.send("Host-only DM command.")
+    if g.phase != "night":
+        return await ctx.send("You can only skip during the **night**.")
+    # move forward at least one step
+    g.night_step = max(0, g.night_step)
+    step = next_night_step(g)
+    return await _host_run_phase(ctx, step)
 
 @bot.command()
 async def phase1(ctx: commands.Context):
