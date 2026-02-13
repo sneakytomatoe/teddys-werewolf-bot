@@ -1,20 +1,19 @@
-# Teddy's Werewolf Bonanza Discord Bot
+# Teddy’s Werewolf Bonanza — Discord Bot 🐺🌕
 
-## Setup
+A Discord bot for running “Teddy’s Werewolf Bonanza” with secret roles, DM-based night actions, and host-controlled phases.
 
-1. Add environment variable:
-   DISCORD_TOKEN=your_token_here
+## Features
+- Secret role assignment via DM (with role images)
+- Wolves know each other (DM list)
+- Host gets a full role list via DM
+- Host gets DM notifications when actions are submitted (protect/defend/investigate/kill/etc.)
+- Flexible player counts (scales wolves automatically)
+- Manual host-driven night phases + voting control (no forced timers unless you add them back)
 
-2. Install requirements:
+---
+
+## Setup (Local)
+1. Install Python 3.11+  
+2. Install deps:
+   ```bash
    pip install -r requirements.txt
-
-3. Run:
-   python werewolf_bot.py
-
-## Commands
-
-!ww_create
-!ww_setplayers @p1 @p2 @p3 @p4 @p5 @p6 @p7 @p8
-!ww_start
-!ww_status
-!ww_end
