@@ -60,6 +60,12 @@ def is_wolf_role(role: str) -> bool:
     return role in {STOIC_OMEGA, SOFT_ALPHA, NEEDY_BETA, LONER_ALPHA}
 
 # -----------------------
+# Config
+# -----------------------
+MIN_PLAYERS = 5
+MAX_PLAYERS = 20
+
+# -----------------------
 # Role images (URLs)
 # -----------------------
 ROLE_IMAGE_URLS = {
@@ -202,6 +208,19 @@ def check_win(g: Game) -> Optional[str]:
         return "🐺 **Werewolves win!** Wolves equal/outnumber villagers."
     return None
 
+
+def wolf_count_for(n_players: int) -> int:
+    """Scale wolves by lobby size."""
+    if n_players <= 6:
+        return 1
+    if n_players <= 9:
+        return 2
+    if n_players <= 13:
+        return 3
+    if n_players <= 17:
+        return 4
+    return 5
+
 def pick_wolf_roles(n: int) -> List[str]:
     pool = (
         [STOIC_OMEGA, STOIC_OMEGA] +
@@ -225,12 +244,14 @@ def pick_wolf_roles(n: int) -> List[str]:
 def pick_villager_roles(n: int) -> List[str]:
     specials = VILLAGER_SPECIALS.copy()
     random.shuffle(specials)
-    chosen: List[str] = []
-    k = random.choice([2, 3, 3, 4, 4, 5])
-    k = min(k, n, len(specials))
-    chosen.extend(specials[:k])
+
+    # Scale specials with lobby size: roughly 1 special per 2 villagers, minimum 1.
+    num_specials = min(len(specials), max(1, round(n / 2)))
+
+    chosen = specials[:num_specials]
     while len(chosen) < n:
         chosen.append(VILLAGER)
+
     random.shuffle(chosen)
     return chosen
 
@@ -333,8 +354,11 @@ async def ww_setplayers(ctx: commands.Context, *members: discord.Member):
         if m.id not in ids:
             ids.append(m.id)
 
-    if len(ids) != 8:
-        return await ctx.send(f"This ruleset needs **exactly 8 players**. You provided **{len(ids)}**.")
+    if not (MIN_PLAYERS <= len(ids) <= MAX_PLAYERS):
+        return await ctx.send(
+            f"Game requires between **{MIN_PLAYERS} and {MAX_PLAYERS} players**. "
+            f"You provided **{len(ids)}**."
+        )
 
     g.players = ids
     await ctx.send("✅ Player roster set:\n" + " ".join([f"<@{uid}>" for uid in g.players]))
@@ -348,14 +372,21 @@ async def ww_start(ctx: commands.Context):
         return await ctx.send("Only the host can start.")
     if g.started:
         return await ctx.send("Already started.")
-    if len(g.players) != 8:
-        return await ctx.send("This ruleset expects **exactly 8 players** (3 wolves, 5 villagers).")
+    n_players = len(g.players)
 
-    wolf_ids = random.sample(g.players, 3)
+    if not (MIN_PLAYERS <= n_players <= MAX_PLAYERS):
+        return await ctx.send(
+            f"Game requires between **{MIN_PLAYERS} and {MAX_PLAYERS} players**."
+        )
+
+    n_wolves = wolf_count_for(n_players)
+    n_villagers = n_players - n_wolves
+
+    wolf_ids = random.sample(g.players, n_wolves)
     vill_ids = [uid for uid in g.players if uid not in wolf_ids]
 
-    wolf_roles = pick_wolf_roles(3)
-    vill_roles = pick_villager_roles(5)
+    wolf_roles = pick_wolf_roles(n_wolves)
+    vill_roles = pick_villager_roles(n_villagers)
 
     g.roles = {}
     for uid, r in zip(wolf_ids, wolf_roles):
