@@ -2,6 +2,7 @@
 import os
 import random
 import asyncio
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -59,56 +60,57 @@ ROLE_DISPLAY = {
 def is_wolf_role(role: str) -> bool:
     return role in {STOIC_OMEGA, SOFT_ALPHA, NEEDY_BETA, LONER_ALPHA}
 
+
 # -----------------------
 # Role images (URLs)
 # -----------------------
 ROLE_IMAGE_URLS = {
     SOFT_ALPHA: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966298194837576/SoftAlpha_Werewolf_2.png?ex=6990daf1&is=698f8971&hm=8d4281e7b8ce5ef00307ca81a10ba183286461ed0f2687cef152cedfe814fc75&",
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966302842257642/SoftAlpha_Werewolf_1.png?ex=6990daf2&is=698f8972&hm=61773ce59146e5f6dc09d1a742353f8636b1e799e6d948ce936e8c538606338a&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472009887277125744/ww_wolf_softAlpha_1.png?ex=69910389&is=698fb209&hm=3d262b691377b87327c94bb7b947d6e9bb2e3441d3114da0550b56e5eae639f6&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472010096895856721/ww_wolf_softAlpha_2.png?ex=699103bb&is=698fb23b&hm=a9192f32ad509faaff0ac42d3049145400bb7a6c8097849989787b5b0281f7a9&=&format=webp&quality=lossless",
     ],
     STOIC_OMEGA: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966307959308468/StoicOmega_Werewolf_1.png?ex=6990daf3&is=698f8973&hm=94b9b30f3a9c80fd0eb743abdcd5dd65caaa8a1fde039414658d380b882260b7&=&format=webp&quality=lossless",
-        # NOTE: this link filename looks like Needy Beta, but kept as provided
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966327551033414/NeedyBeta_Werewolf_1.png?ex=6990daf8&is=698f8978&hm=e43ae26192ecb38d40f8551881a8d530ea11e959d3c0dd0121da4dd925f557f1&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472008296360706341/ww_wolf_stoicOmega_1.png?ex=6991020e&is=698fb08e&hm=06d6200d8f2430a99e4e4c889580d33497c39b73991faa5b32f88796195e4948&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472008601315836095/ww_wolf_stoicOmega_2.png?ex=69910257&is=698fb0d7&hm=de228da91390700b707121d02d12f0eafba73cc21c2bf407f507b674c3750030&=&format=webp&quality=lossless",
     ],
     LONER_ALPHA: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966312514195608/LonerAlpha_Werewolf_1.png?ex=6990daf4&is=698f8974&hm=254dddee1680af6fbdf1b4ac176474114b03072ac1f44c00857f8e06011cc701&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472010682814697543/ww_wolf_lonerAlpha.png?ex=69910447&is=698fb2c7&hm=9fa6b28b7050c8e86fa1a69e7ec267e643fa82ef2b2f5e5d8081c5e742ebd47b&=&format=webp&quality=lossless",
     ],
     NEEDY_BETA: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966320240230470/NeedyBeta_Werewolf_2.png?ex=6990daf6&is=698f8976&hm=b4d4c6e437aea678565e0d3e4302496d7cf1e73115ed8f48fefe71c3cfc3db1b&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472009519906291756/ww_wolf_needyBeta.png?ex=69910332&is=698fb1b2&hm=003883d24dce4cdfb164a1bfcd7fb070075517bc0c1a0c84a285d2b646e7c7fa&=&format=webp&quality=lossless",
     ],
     VILLAGER: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966332055715900/Base_Villager_1.png?ex=6990daf9&is=698f8979&hm=58fe6472227607b135cb4ee1df806834940b0dbefee71eb4a9409920e1601a32&",
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966338795966760/Base_Villager_2.png?ex=6990dafa&is=698f897a&hm=7cb351d1fb6c9190bb21ae35293dd8d999b7d439146d6832b83cd08c963584b3&",
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966349721993337/Base_Villager_3.png?ex=6990dafd&is=698f897d&hm=9e11e6b658518e67afd894602b06cc00cc89deedfe8163b85989f7b2ee7fc67d&",
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966382144094228/Base_Villager_4.png?ex=6990db05&is=698f8985&hm=6f263abbc384ee4caf5980a81131eafa1b91815895236bfcc250ea92f3719cb9&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472005977401462837/ww_villager_villager_1.png?ex=6990ffe5&is=698fae65&hm=4ad29bdc910f5a1d04ed1ea8a7b37b86db1594660e71a2d601ba77239c3ec2f9&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472006218892705917/ww_villager_villager_2.png?ex=6991001f&is=698fae9f&hm=77c152b9c4278915b3ec731992f8124d9eb544b69f3f7b6bc649f0d01f16e539&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472006416599355544/ww_villager_villager_3.png?ex=6991004e&is=698faece&hm=63bdaedd508889554bcc8ecfe1c97a9eebf14a280867a5da6563b537f6af0e88&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472007144273350798/ww_villager_villager_4.png?ex=699100fb&is=698faf7b&hm=d1efc832b3b08959d4f0f7c1c14201d495d2a2803b398fe8d870edb7c2c4b9fd&=&format=webp&quality=lossless",
     ],
     LAWYER: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966388049412331/Lawyer_Villager_1.png?ex=6990db06&is=698f8986&hm=1da9520713ec0e41fd5900f992b513648e10fc02c1314501a0e1c407292da2e0&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472005675662970981/ww_villager_lawyer.png?ex=6990ff9d&is=698fae1d&hm=ecfee4adb3720fc1f3a259b550af924ff48a8af6549df9a276d3b6765a5884c3&=&format=webp&quality=lossless",
     ],
     VILLAGE_IDIOT: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966394886389862/Idiot_Villager_1.png?ex=6990db08&is=698f8988&hm=8f9f48e6d2e0b660d4d872d5a25cf48fb55c5fb07ed7ae5c354b0036e611a903&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472005158115348591/ww_villager_villageIdiot.png?ex=6990ff22&is=698fada2&hm=63e9bd79940a821dd7143f332ba4ee5949ea48476831be9cb1ecb88c36113592&=&format=webp&quality=lossless",
     ],
     DETECTIVE: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966402607972477/Detective_Villager_1.png?ex=6990db0a&is=698f898a&hm=b24088e9a4ff394deaf6d99b0d71f01f6165ce83bc18c9bd4adb3827f1151edd&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472003772363309187/ww_villager_detective.png?ex=6990fdd7&is=698fac57&hm=c932b3daf5c2f61142dfecad1500f241ff5fe866d9667164c7be97948839683e&=&format=webp&quality=lossless",
     ],
     DOCTOR: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966410753446082/Doctor_Villager_1.png?ex=6990db0c&is=698f898c&hm=c198c2d459d7264645fb15e29851fb056dfe06c06b312298c3c5b12aa677667c&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472001767947636846/ww_villager_doctor.png?ex=6990fbf9&is=698faa79&hm=ae042aa1eb674f4a3faeb8f1bea8ce48f3cc827b9bfba2d44be66cb4dca00098&=&format=webp&quality=lossless",
     ],
     SNORLAX: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966415555924172/Snorlax_Villager_1.png?ex=6990db0d&is=698f898d&hm=28c0c0774ec3094c2920b7da35ec86ab2d237a20cf2a3fbae5d0d3b7e135be77&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472000747460890655/ww_villager_snorlax.png?ex=6990fb06&is=698fa986&hm=834439434533ae98f23031fb58c380d8f8efee1fc95009ff3e1f446950a10edb&=&format=webp&quality=lossless",
     ],
     MATCHMAKER: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966421058851090/Matchmaker_Villager_1.png?ex=6990db0e&is=698f898e&hm=4172a8145c9fa711c2288b53f13d5147d652a43a8a6225684465d56e9f044682&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1471999193756340489/ww_villager_matchmaker.png?ex=6990f994&is=698fa814&hm=cc18261f5c4cc0a40abc02a3ab07d42c173ec92ce7d58937b9276a222c4bd96b&=&format=webp&quality=lossless",
     ],
     UTENA: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966424066162748/Utena_Villager_1.png?ex=6990db0f&is=698f898f&hm=70dc3b4bf21131340123052ace79bc7eb2a0e5a0417840b24d49259ceb7af8e9&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1471997866552590438/ww_villager_utena.png?ex=6990f857&is=698fa6d7&hm=b169771ed29ee38e2014d4d1b48a583d0866204d24bbb607203248089faa94a6&=&format=webp&quality=lossless",
     ],
     MOD_FAVORITE: [
-        "https://cdn.discordapp.com/attachments/1471964301051826382/1471966343996899463/ModFav_Villager_1.png?ex=6990dafc&is=698f897c&hm=7f55d78f60054b55c423f792bf433872991f2c68c37487de1d21021590756567&",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472007489032814702/ww_villager_modsFav.png?ex=6991014d&is=698fafcd&hm=751e9ede88d1307ad47802bafd8c593762532444679821796d3d2fcd7bf34413&=&format=webp&quality=lossless",
     ],
 }
+
 
 # -----------------------
 # Game state
@@ -126,6 +128,10 @@ class Game:
 
     # Lock-in per-player chosen image URL
     role_image_chosen: Dict[int, str] = field(default_factory=dict)
+
+    # Private role channels (created in guild, unlocked on game end)
+    private_category_id: Optional[int] = None
+    role_channels: Dict[str, int] = field(default_factory=dict)
 
     # Lovers (Matchmaker)
     lovers: Optional[Tuple[int, int]] = None
@@ -170,6 +176,86 @@ class Game:
         return [uid for uid in self.alive if not is_wolf_role(self.roles.get(uid, ""))]
 
 games: Dict[int, Game] = {}
+
+# Stores the last unlocked category per channel so we can delete it when a new game starts.
+last_game_category_by_channel: Dict[int, int] = {}
+
+ROLE_CHAT_KEYS = {
+    'wolves': 'wolves-den',
+    'doctor': 'doctor-room',
+    'lawyer': 'lawyer-room',
+    'detective': 'detective-room',
+    'matchmaker': 'matchmaker-room',
+    'omega': 'omega-room',
+    'beta': 'beta-room',
+    'lovers': 'lovers-room',
+}
+
+async def create_role_chat_category_for(channel: discord.TextChannel, g: Game) -> Optional[discord.CategoryChannel]:
+    if not channel.guild:
+        return None
+    guild = channel.guild
+    if g.private_category_id:
+        cat = guild.get_channel(g.private_category_id)
+        if isinstance(cat, discord.CategoryChannel):
+            return cat
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+    }
+    name = f\"werewolf-game-{channel.id}\"
+    cat = await guild.create_category(name=name, overwrites=overwrites)
+    g.private_category_id = cat.id
+    return cat
+
+async def ensure_role_channel_for(channel: discord.TextChannel, g: Game, key: str, member_ids: List[int]) -> Optional[discord.TextChannel]:
+    if not channel.guild:
+        return None
+    guild = channel.guild
+    cat = await create_role_chat_category_for(channel, g)
+    if not cat:
+        return None
+    if key in g.role_channels:
+        ch = guild.get_channel(g.role_channels[key])
+        if isinstance(ch, discord.TextChannel):
+            return ch
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
+    }
+    host = guild.get_member(g.host_id)
+    if host:
+        overwrites[host] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+    for uid in member_ids:
+        m = guild.get_member(uid)
+        if m:
+            overwrites[m] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
+    name = ROLE_CHAT_KEYS.get(key, f\"role-{key}\")
+    ch = await guild.create_text_channel(name=name, category=cat, overwrites=overwrites)
+    g.role_channels[key] = ch.id
+    return ch
+
+async def unlock_game_channels_for(channel: discord.TextChannel, g: Game):
+    \"\"\"Unlock role channels read-only for everyone so you can read the history after the game.\"\"\"
+    if not channel.guild:
+        return
+    guild = channel.guild
+    # Unlock category
+    if g.private_category_id:
+        cat = guild.get_channel(g.private_category_id)
+        if isinstance(cat, discord.CategoryChannel):
+            ow = cat.overwrites
+            ow[guild.default_role] = discord.PermissionOverwrite(view_channel=True, read_message_history=True, send_messages=False)
+            await cat.edit(overwrites=ow)
+            last_game_category_by_channel[channel.id] = cat.id
+    # Unlock each channel
+    for key, cid in list(g.role_channels.items()):
+        ch = guild.get_channel(cid)
+        if isinstance(ch, discord.TextChannel):
+            ow = ch.overwrites
+            ow[guild.default_role] = discord.PermissionOverwrite(view_channel=True, read_message_history=True, send_messages=False)
+            await ch.edit(overwrites=ow)
+
 
 # -----------------------
 # Helpers
@@ -303,6 +389,22 @@ def omega_can_act_this_night(g: Game) -> bool:
 # -----------------------
 @bot.command()
 async def ww_create(ctx: commands.Context):
+    # If a previous game left an unlocked archive category, delete it when starting a new one
+    if ctx.guild and ctx.channel.id in last_game_category_by_channel:
+        old_cat_id = last_game_category_by_channel.pop(ctx.channel.id, None)
+        if old_cat_id:
+            old_cat = ctx.guild.get_channel(old_cat_id)
+            if isinstance(old_cat, discord.CategoryChannel):
+                for ch in list(old_cat.channels):
+                    try:
+                        await ch.delete()
+                    except Exception:
+                        pass
+                try:
+                    await old_cat.delete()
+                except Exception:
+                    pass
+
     if ctx.channel.id in games and games[ctx.channel.id].phase != "lobby":
         return await ctx.send("A game is already running in this channel.")
     games[ctx.channel.id] = Game(channel_id=ctx.channel.id, host_id=ctx.author.id)
@@ -367,6 +469,25 @@ async def ww_start(ctx: commands.Context):
 
     g.alive = set(g.players)
     g.started = True
+
+
+    # Create private role chats (server channels) for coordination.
+    # Hidden during the game, then unlocked read-only on !ww_end / win.
+    channel = ctx.channel
+    wolves = [uid for uid, role in g.roles.items() if is_wolf_role(role)]
+    await ensure_role_channel_for(channel, g, 'wolves', wolves)
+    role_to_key = {
+        DOCTOR: 'doctor',
+        LAWYER: 'lawyer',
+        DETECTIVE: 'detective',
+        MATCHMAKER: 'matchmaker',
+        STOIC_OMEGA: 'omega',
+        NEEDY_BETA: 'beta',
+    }
+    for role_name, key in role_to_key.items():
+        members = [uid for uid, r in g.roles.items() if r == role_name]
+        if members:
+            await ensure_role_channel_for(channel, g, key, members)
 
     wolf_list_mentions = ", ".join([f"<@{w}>" for w in wolf_ids])
 
@@ -540,7 +661,10 @@ async def start_night(channel: discord.TextChannel, guild: discord.Guild):
     win = check_win(g)
     if win:
         await announce(channel, win)
-        games.pop(channel.id, None)
+            # Unlock role channels for everyone (read-only) so you can enjoy the history
+    await unlock_game_channels_for(ctx.channel, g)
+
+games.pop(channel.id, None)
         return
 
     msg = "🌙 **Night phase**\n"
@@ -624,6 +748,7 @@ async def resolve_vote(g: Game, channel: discord.TextChannel, guild: discord.Gui
     if win:
         await announce(channel, win)
         await notify_host(g, guild, win)
+        await unlock_game_channels_for(channel, g)
         games.pop(channel.id, None)
         return
 
@@ -859,6 +984,7 @@ async def night_end(ctx: commands.Context):
     if win:
         await announce(channel, win)
         await notify_host(g, guild, win)
+        await unlock_game_channels_for(channel, g)
         games.pop(channel.id, None)
         return
 
@@ -911,6 +1037,12 @@ async def match(ctx: commands.Context, p1: Optional[discord.User] = None, p2: Op
     if p1.id not in g.alive or p2.id not in g.alive:
         return await ctx.send("Both must be alive.")
     g.lovers = (p1.id, p2.id)
+
+
+    # Create lovers room in the server (private during game)
+    game_channel = bot.get_channel(g.channel_id)
+    if isinstance(game_channel, discord.TextChannel):
+        await ensure_role_channel_for(game_channel, g, 'lovers', [p1.id, p2.id])
     g.matchmaker_used = True
     channel, guild = _resolve_channel_and_guild(g)
     if guild:
