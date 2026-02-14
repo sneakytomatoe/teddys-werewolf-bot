@@ -16,8 +16,20 @@ from discord.ext import commands
 from dotenv import load_dotenv
 
 load_dotenv()
-TOKEN = os.getenv("DISCORD_TOKEN")
 
+# Railway/Render/etc: set ONE of these env vars
+# DISCORD_TOKEN (preferred), TOKEN, DISCORD_BOT_TOKEN
+TOKEN = (
+    os.getenv("DISCORD_TOKEN")
+    or os.getenv("TOKEN")
+    or os.getenv("DISCORD_BOT_TOKEN")
+)
+
+if not TOKEN or not isinstance(TOKEN, str) or not TOKEN.strip():
+    raise RuntimeError(
+        "Discord bot token not found. Set an environment variable in Railway → Service → Variables: "
+        "DISCORD_TOKEN (preferred) or TOKEN or DISCORD_BOT_TOKEN."
+    )
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
