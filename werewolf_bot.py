@@ -2,7 +2,6 @@
 import os
 import random
 import asyncio
-import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -60,17 +59,10 @@ ROLE_DISPLAY = {
 def is_wolf_role(role: str) -> bool:
     return role in {STOIC_OMEGA, SOFT_ALPHA, NEEDY_BETA, LONER_ALPHA}
 
-
-# -----------------------
-# Config
-# -----------------------
-MIN_PLAYERS = 6
-MAX_PLAYERS = 20
-
-
 # -----------------------
 # Role images (URLs)
 # -----------------------
+
 ROLE_IMAGE_URLS = {
     SOFT_ALPHA: [
         "https://media.discordapp.net/attachments/1471964301051826382/1472009887277125744/ww_wolf_softAlpha_1.png?ex=69910389&is=698fb209&hm=3d262b691377b87327c94bb7b947d6e9bb2e3441d3114da0550b56e5eae639f6&=&format=webp&quality=lossless",
@@ -87,13 +79,13 @@ ROLE_IMAGE_URLS = {
         "https://media.discordapp.net/attachments/1471964301051826382/1472009519906291756/ww_wolf_needyBeta.png?ex=69910332&is=698fb1b2&hm=003883d24dce4cdfb164a1bfcd7fb070075517bc0c1a0c84a285d2b646e7c7fa&=&format=webp&quality=lossless",
     ],
     VILLAGER: [
-        "https://media.discordapp.net/attachments/1471964301051826382/1472005977401462837/ww_villager_villager_1.png?ex=6990ffe5&is=698fae65&hm=4ad29bdc910f5a1d04ed1ea8a7b37b86db1594660e71a2d601ba77239c3ec2f9&=&format=webp&quality=lossless",
-        "https://media.discordapp.net/attachments/1471964301051826382/1472006218892705917/ww_villager_villager_2.png?ex=6991001f&is=698fae9f&hm=77c152b9c4278915b3ec731992f8124d9eb544b69f3f7b6bc649f0d01f16e539&=&format=webp&quality=lossless",
-        "https://media.discordapp.net/attachments/1471964301051826382/1472006416599355544/ww_villager_villager_3.png?ex=6991004e&is=698faece&hm=63bdaedd508889554bcc8ecfe1c97a9eebf14a280867a5da6563b537f6af0e88&=&format=webp&quality=lossless",
-        "https://media.discordapp.net/attachments/1471964301051826382/1472007144273350798/ww_villager_villager_4.png?ex=699100fb&is=698faf7b&hm=d1efc832b3b08959d4f0f7c1c14201d495d2a2803b398fe8d870edb7c2c4b9fd&=&format=webp&quality=lossless",
+       "https://media.discordapp.net/attachments/1471964301051826382/1472005977401462837/ww_villager_villager_1.png?ex=6990ffe5&is=698fae65&hm=4ad29bdc910f5a1d04ed1ea8a7b37b86db1594660e71a2d601ba77239c3ec2f9&=&format=webp&quality=lossless",
+       "https://media.discordapp.net/attachments/1471964301051826382/1472006218892705917/ww_villager_villager_2.png?ex=6991001f&is=698fae9f&hm=77c152b9c4278915b3ec731992f8124d9eb544b69f3f7b6bc649f0d01f16e539&=&format=webp&quality=lossless",
+       "https://media.discordapp.net/attachments/1471964301051826382/1472006416599355544/ww_villager_villager_3.png?ex=6991004e&is=698faece&hm=63bdaedd508889554bcc8ecfe1c97a9eebf14a280867a5da6563b537f6af0e88&=&format=webp&quality=lossless",
+       "https://media.discordapp.net/attachments/1471964301051826382/1472007144273350798/ww_villager_villager_4.png?ex=699100fb&is=698faf7b&hm=d1efc832b3b08959d4f0f7c1c14201d495d2a2803b398fe8d870edb7c2c4b9fd&=&format=webp&quality=lossless",
     ],
     LAWYER: [
-        "https://media.discordapp.net/attachments/1471964301051826382/1472005675662970981/ww_villager_lawyer.png?ex=6990ff9d&is=698fae1d&hm=ecfee4adb3720fc1f3a259b550af924ff48a8af6549df9a276d3b6765a5884c3&=&format=webp&quality=lossless",
+        "https://media.discordapp.net/attachments/1471964301051826382/1472005675662970981/ww_villager_lawyer.png?ex=6990ff9d&is=698fae1d&hm=ecfee4adb3720fc1f3a259b550af924ff48a8af6549df9a276d3b6765a5884c3&=&format=webp&quality=lossless"
     ],
     VILLAGE_IDIOT: [
         "https://media.discordapp.net/attachments/1471964301051826382/1472005158115348591/ww_villager_villageIdiot.png?ex=6990ff22&is=698fada2&hm=63e9bd79940a821dd7143f332ba4ee5949ea48476831be9cb1ecb88c36113592&=&format=webp&quality=lossless",
@@ -135,10 +127,6 @@ class Game:
 
     # Lock-in per-player chosen image URL
     role_image_chosen: Dict[int, str] = field(default_factory=dict)
-
-    # Private role channels (created in guild, unlocked on game end)
-    private_category_id: Optional[int] = None
-    role_channels: Dict[str, int] = field(default_factory=dict)
 
     # Lovers (Matchmaker)
     lovers: Optional[Tuple[int, int]] = None
@@ -184,86 +172,6 @@ class Game:
 
 games: Dict[int, Game] = {}
 
-# Stores the last unlocked category per channel so we can delete it when a new game starts.
-last_game_category_by_channel: Dict[int, int] = {}
-
-ROLE_CHAT_KEYS = {
-    'wolves': 'wolves-den',
-    'doctor': 'doctor-room',
-    'lawyer': 'lawyer-room',
-    'detective': 'detective-room',
-    'matchmaker': 'matchmaker-room',
-    'omega': 'omega-room',
-    'beta': 'beta-room',
-    'lovers': 'lovers-room',
-}
-
-async def create_role_chat_category_for(channel: discord.TextChannel, g: Game) -> Optional[discord.CategoryChannel]:
-    if not channel.guild:
-        return None
-    guild = channel.guild
-    if g.private_category_id:
-        cat = guild.get_channel(g.private_category_id)
-        if isinstance(cat, discord.CategoryChannel):
-            return cat
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
-    }
-    name = f"werewolf-game-{channel.id}"
-    cat = await guild.create_category(name=name, overwrites=overwrites)
-    g.private_category_id = cat.id
-    return cat
-
-async def ensure_role_channel_for(channel: discord.TextChannel, g: Game, key: str, member_ids: List[int]) -> Optional[discord.TextChannel]:
-    if not channel.guild:
-        return None
-    guild = channel.guild
-    cat = await create_role_chat_category_for(channel, g)
-    if not cat:
-        return None
-    if key in g.role_channels:
-        ch = guild.get_channel(g.role_channels[key])
-        if isinstance(ch, discord.TextChannel):
-            return ch
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(view_channel=False),
-        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
-    }
-    host = guild.get_member(g.host_id)
-    if host:
-        overwrites[host] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-    for uid in member_ids:
-        m = guild.get_member(uid)
-        if m:
-            overwrites[m] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-    name = ROLE_CHAT_KEYS.get(key, f"role-{key}")
-    ch = await guild.create_text_channel(name=name, category=cat, overwrites=overwrites)
-    g.role_channels[key] = ch.id
-    return ch
-
-async def unlock_game_channels_for(channel: discord.TextChannel, g: Game):
-    """Unlock role channels read-only for everyone so you can read the history after the game."""
-    if not channel.guild:
-        return
-    guild = channel.guild
-    # Unlock category
-    if g.private_category_id:
-        cat = guild.get_channel(g.private_category_id)
-        if isinstance(cat, discord.CategoryChannel):
-            ow = cat.overwrites
-            ow[guild.default_role] = discord.PermissionOverwrite(view_channel=True, read_message_history=True, send_messages=False)
-            await cat.edit(overwrites=ow)
-            last_game_category_by_channel[channel.id] = cat.id
-    # Unlock each channel
-    for key, cid in list(g.role_channels.items()):
-        ch = guild.get_channel(cid)
-        if isinstance(ch, discord.TextChannel):
-            ow = ch.overwrites
-            ow[guild.default_role] = discord.PermissionOverwrite(view_channel=True, read_message_history=True, send_messages=False)
-            await ch.edit(overwrites=ow)
-
-
 # -----------------------
 # Helpers
 # -----------------------
@@ -297,19 +205,6 @@ def check_win(g: Game) -> Optional[str]:
         return "🐺 **Werewolves win!** Wolves equal/outnumber villagers."
     return None
 
-
-def wolf_count_for(n_players: int) -> int:
-    """Scale wolves by lobby size."""
-    if n_players <= 7:
-        return 1
-    if n_players <= 10:
-        return 2
-    if n_players <= 14:
-        return 3
-    if n_players <= 17:
-        return 4
-    return 5
-
 def pick_wolf_roles(n: int) -> List[str]:
     pool = (
         [STOIC_OMEGA, STOIC_OMEGA] +
@@ -333,14 +228,12 @@ def pick_wolf_roles(n: int) -> List[str]:
 def pick_villager_roles(n: int) -> List[str]:
     specials = VILLAGER_SPECIALS.copy()
     random.shuffle(specials)
-
-    # Scale specials with lobby size: roughly 1 special per 2 villagers, minimum 1.
-    num_specials = min(len(specials), max(1, round(n / 2)))
-
-    chosen = specials[:num_specials]
+    chosen: List[str] = []
+    k = random.choice([2, 3, 3, 4, 4, 5])
+    k = min(k, n, len(specials))
+    chosen.extend(specials[:k])
     while len(chosen) < n:
         chosen.append(VILLAGER)
-
     random.shuffle(chosen)
     return chosen
 
@@ -411,22 +304,6 @@ def omega_can_act_this_night(g: Game) -> bool:
 # -----------------------
 @bot.command()
 async def ww_create(ctx: commands.Context):
-    # If a previous game left an unlocked archive category, delete it when starting a new one
-    if ctx.guild and ctx.channel.id in last_game_category_by_channel:
-        old_cat_id = last_game_category_by_channel.pop(ctx.channel.id, None)
-        if old_cat_id:
-            old_cat = ctx.guild.get_channel(old_cat_id)
-            if isinstance(old_cat, discord.CategoryChannel):
-                for ch in list(old_cat.channels):
-                    try:
-                        await ch.delete()
-                    except Exception:
-                        pass
-                try:
-                    await old_cat.delete()
-                except Exception:
-                    pass
-
     if ctx.channel.id in games and games[ctx.channel.id].phase != "lobby":
         return await ctx.send("A game is already running in this channel.")
     games[ctx.channel.id] = Game(channel_id=ctx.channel.id, host_id=ctx.author.id)
@@ -459,11 +336,8 @@ async def ww_setplayers(ctx: commands.Context, *members: discord.Member):
         if m.id not in ids:
             ids.append(m.id)
 
-    if not (MIN_PLAYERS <= len(ids) <= MAX_PLAYERS):
-        return await ctx.send(
-            f"Game requires between **{MIN_PLAYERS} and {MAX_PLAYERS} players**. "
-            f"You provided **{len(ids)}**."
-        )
+    if len(ids) != 8:
+        return await ctx.send(f"This ruleset needs **exactly 8 players**. You provided **{len(ids)}**.")
 
     g.players = ids
     await ctx.send("✅ Player roster set:\n" + " ".join([f"<@{uid}>" for uid in g.players]))
@@ -477,21 +351,14 @@ async def ww_start(ctx: commands.Context):
         return await ctx.send("Only the host can start.")
     if g.started:
         return await ctx.send("Already started.")
-    n_players = len(g.players)
+    if len(g.players) != 8:
+        return await ctx.send("This ruleset expects **exactly 8 players** (3 wolves, 5 villagers).")
 
-    if not (MIN_PLAYERS <= n_players <= MAX_PLAYERS):
-        return await ctx.send(
-            f"Game requires between **{MIN_PLAYERS} and {MAX_PLAYERS} players**."
-        )
-
-    n_wolves = wolf_count_for(n_players)
-    n_villagers = n_players - n_wolves
-
-    wolf_ids = random.sample(g.players, n_wolves)
+    wolf_ids = random.sample(g.players, 3)
     vill_ids = [uid for uid in g.players if uid not in wolf_ids]
 
-    wolf_roles = pick_wolf_roles(n_wolves)
-    vill_roles = pick_villager_roles(n_villagers)
+    wolf_roles = pick_wolf_roles(3)
+    vill_roles = pick_villager_roles(5)
 
     g.roles = {}
     for uid, r in zip(wolf_ids, wolf_roles):
@@ -501,25 +368,6 @@ async def ww_start(ctx: commands.Context):
 
     g.alive = set(g.players)
     g.started = True
-
-
-    # Create private role chats (server channels) for coordination.
-    # Hidden during the game, then unlocked read-only on !ww_end / win.
-    channel = ctx.channel
-    wolves = [uid for uid, role in g.roles.items() if is_wolf_role(role)]
-    await ensure_role_channel_for(channel, g, 'wolves', wolves)
-    role_to_key = {
-        DOCTOR: 'doctor',
-        LAWYER: 'lawyer',
-        DETECTIVE: 'detective',
-        MATCHMAKER: 'matchmaker',
-        STOIC_OMEGA: 'omega',
-        NEEDY_BETA: 'beta',
-    }
-    for role_name, key in role_to_key.items():
-        members = [uid for uid, r in g.roles.items() if r == role_name]
-        if members:
-            await ensure_role_channel_for(channel, g, key, members)
 
     wolf_list_mentions = ", ".join([f"<@{w}>" for w in wolf_ids])
 
@@ -562,6 +410,32 @@ async def ww_start(ctx: commands.Context):
             await ctx.send(f"⚠️ Could not DM <@{uid}> (they may have DMs disabled).")
 
     await ctx.send("✅ Roles assigned (check DMs). Night begins in 3 seconds...")
+
+    # ------------------------
+    # CREATE PRIVATE ROLE CHANNELS
+    # ------------------------
+
+    role_to_members = {}
+    for uid, role in g.roles.items():
+        role_to_members.setdefault(role, []).append(uid)
+
+    # Wolves grouped together
+    wolf_members = [
+        uid for uid in g.players
+        if is_wolf_role(g.roles[uid])
+    ]
+
+    if wolf_members:
+        await create_role_channel(g, ctx.guild, "wolves", wolf_members)
+
+    # Non-wolf special roles
+    for role, members in role_to_members.items():
+        if role == VILLAGER:
+            continue
+        if is_wolf_role(role):
+            continue
+        await create_role_channel(g, ctx.guild, role, members)
+
     await asyncio.sleep(3)
     await start_night(ctx.channel, ctx.guild)
 
@@ -572,8 +446,18 @@ async def ww_end(ctx: commands.Context):
         return await ctx.send("No game to end.")
     if ctx.author.id != g.host_id:
         return await ctx.send("Only the host can end the game.")
+
+    # Unlock role channels
+    for role, channel_id in g.role_channels.items():
+        channel = ctx.guild.get_channel(channel_id)
+        if channel:
+            await channel.set_permissions(
+                ctx.guild.default_role,
+                view_channel=True
+            )
+
     del games[ctx.channel.id]
-    await ctx.send("Game ended.")
+    await ctx.send("Game ended. Role chats unlocked for viewing.")
 
 # -----------------------
 # Phase Logic (Night/Day/Vote)
@@ -693,8 +577,6 @@ async def start_night(channel: discord.TextChannel, guild: discord.Guild):
     win = check_win(g)
     if win:
         await announce(channel, win)
-        # Unlock role channels for everyone (read-only) so you can enjoy the history
-        await unlock_game_channels_for(channel, g)
         games.pop(channel.id, None)
         return
 
@@ -779,7 +661,6 @@ async def resolve_vote(g: Game, channel: discord.TextChannel, guild: discord.Gui
     if win:
         await announce(channel, win)
         await notify_host(g, guild, win)
-        await unlock_game_channels_for(channel, g)
         games.pop(channel.id, None)
         return
 
@@ -1015,7 +896,6 @@ async def night_end(ctx: commands.Context):
     if win:
         await announce(channel, win)
         await notify_host(g, guild, win)
-        await unlock_game_channels_for(channel, g)
         games.pop(channel.id, None)
         return
 
@@ -1068,12 +948,6 @@ async def match(ctx: commands.Context, p1: Optional[discord.User] = None, p2: Op
     if p1.id not in g.alive or p2.id not in g.alive:
         return await ctx.send("Both must be alive.")
     g.lovers = (p1.id, p2.id)
-
-
-    # Create lovers room in the server (private during game)
-    game_channel = bot.get_channel(g.channel_id)
-    if isinstance(game_channel, discord.TextChannel):
-        await ensure_role_channel_for(game_channel, g, 'lovers', [p1.id, p2.id])
     g.matchmaker_used = True
     channel, guild = _resolve_channel_and_guild(g)
     if guild:
@@ -1227,3 +1101,37 @@ async def on_ready():
     print(f"Logged in as {bot.user} (id={bot.user.id})")
 
 bot.run(TOKEN)
+
+
+async def create_role_channel(g: Game, guild: discord.Guild, role: str, members: list):
+    if role in g.role_channels:
+        return
+
+    overwrites = {
+        guild.default_role: discord.PermissionOverwrite(view_channel=False),
+        guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True)
+    }
+
+    # Host access
+    host_member = guild.get_member(g.host_id)
+    if host_member:
+        overwrites[host_member] = discord.PermissionOverwrite(
+            view_channel=True,
+            send_messages=True
+        )
+
+    # Role members
+    for uid in members:
+        member = guild.get_member(uid)
+        if member:
+            overwrites[member] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True
+            )
+
+    channel = await guild.create_text_channel(
+        name=f"{role}-chat",
+        overwrites=overwrites
+    )
+
+    g.role_channels[role] = channel.id
