@@ -1,4 +1,5 @@
 
+
 def wolf_count_for(player_count: int) -> int:
     # Scales wolves roughly 1 per 4 players, minimum 1
     return max(1, player_count // 4)
@@ -802,19 +803,6 @@ async def status(ctx: commands.Context):
     await ctx.send("\n".join(lines))
 
 @bot.command()
-async def next(ctx: commands.Context):
-    """Host-only (DM): advance to the next applicable night phase."""
-    if ctx.guild is not None:
-        return
-    g = find_game_for_host(ctx.author.id)
-    if not g or ctx.author.id != g.host_id:
-        return await ctx.send("Host-only DM command.")
-    if g.phase != "night":
-        return await ctx.send("`!next` is for **night phases**. Use `!vote_start` / `!vote_end` for day.")
-    step = next_night_step(g)
-    return await _host_run_phase(ctx, step)
-
-@bot.command()
 async def skip(ctx: commands.Context):
     """Host-only (DM): skip the current night phase and jump to the next one."""
     if ctx.guild is not None:
@@ -1143,3 +1131,63 @@ async def create_role_channel(g: Game, guild: discord.Guild, role: str, members:
     )
 
     g.role_channels[role] = channel.id
+
+
+@bot.command()
+async def next(ctx: commands.Context):
+    """Host-only DM command to manually advance phases."""
+    if ctx.guild is not None:
+        return
+
+    # Find game hosted by this user
+    g = None
+    for game in games.values():
+        if game.host_id == ctx.author.id:
+            g = game
+            break
+
+    if not g:
+        return await ctx.send("You are not hosting an active game.")
+
+    channel = bot.get_channel(g.channel_id)
+    if not channel:
+        return await ctx.send("Game channel not found.")
+
+    # NIGHT FLOW
+    if g.phase == "night":
+        g.night_step += 1
+
+        if g.night_step <= 7:
+            await ctx.send(f"🌙 Advancing to night phase {g.night_step}.")
+            await night_prompt_step(g, channel.guild, g.night_step)
+            return
+
+        await ctx.send("🌙 Resolving night...")
+        await resolve_night(g, channel, channel.guild)
+
+        if check_win(g):
+            return
+
+        g.phase = "day"
+        await channel.send("☀️ Day begins. Host use !next to start voting.")
+        return
+
+    # DAY FLOW
+    if g.phase == "day":
+        g.phase = "vote"
+        await channel.send("🗳️ Voting has started.")
+        return await ctx.send("Voting phase started.")
+
+    # VOTING FLOW
+    if g.phase == "vote":
+        await resolve_vote(g, channel, channel.guild)
+
+        if check_win(g):
+            return
+
+        g.phase = "night"
+        g.night_step = 0
+        await channel.send("🌙 Night begins. Host use !next.")
+        return
+
+    await ctx.send("Nothing to advance.")
