@@ -1,3 +1,11 @@
+
+def wolf_count_for(player_count: int) -> int:
+    # Scales wolves roughly 1 per 4 players, minimum 1
+    return max(1, player_count // 4)
+
+MIN_PLAYERS = 6
+MAX_PLAYERS = 20
+
 # werewolf_bot.py
 import os
 import random
@@ -351,7 +359,7 @@ async def ww_start(ctx: commands.Context):
         return await ctx.send("Only the host can start.")
     if g.started:
         return await ctx.send("Already started.")
-    if len(g.players) != 8:
+    if len(g.players) < MIN_PLAYERS or len(g.players) > MAX_PLAYERS:
         return await ctx.send("This ruleset expects **exactly 8 players** (3 wolves, 5 villagers).")
 
     wolf_ids = random.sample(g.players, 3)
