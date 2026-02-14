@@ -661,10 +661,9 @@ async def start_night(channel: discord.TextChannel, guild: discord.Guild):
     win = check_win(g)
     if win:
         await announce(channel, win)
-            # Unlock role channels for everyone (read-only) so you can enjoy the history
-    await unlock_game_channels_for(ctx.channel, g)
-
-games.pop(channel.id, None)
+        # Unlock role channels for everyone (read-only) so you can enjoy the history
+        await unlock_game_channels_for(channel, g)
+        games.pop(channel.id, None)
         return
 
     msg = "🌙 **Night phase**\n"
