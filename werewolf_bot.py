@@ -1,5 +1,4 @@
 
-
 def wolf_count_for(player_count: int) -> int:
     # Scales wolves roughly 1 per 4 players, minimum 1
     return max(1, player_count // 4)
