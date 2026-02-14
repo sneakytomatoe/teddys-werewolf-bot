@@ -203,7 +203,7 @@ async def create_role_chat_category_for(channel: discord.TextChannel, g: Game) -
         guild.default_role: discord.PermissionOverwrite(view_channel=False),
         guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True),
     }
-    name = f\"werewolf-game-{channel.id}\"
+    name = f"werewolf-game-{channel.id}"
     cat = await guild.create_category(name=name, overwrites=overwrites)
     g.private_category_id = cat.id
     return cat
@@ -230,13 +230,13 @@ async def ensure_role_channel_for(channel: discord.TextChannel, g: Game, key: st
         m = guild.get_member(uid)
         if m:
             overwrites[m] = discord.PermissionOverwrite(view_channel=True, send_messages=True, read_message_history=True)
-    name = ROLE_CHAT_KEYS.get(key, f\"role-{key}\")
+    name = ROLE_CHAT_KEYS.get(key, f"role-{key}")
     ch = await guild.create_text_channel(name=name, category=cat, overwrites=overwrites)
     g.role_channels[key] = ch.id
     return ch
 
 async def unlock_game_channels_for(channel: discord.TextChannel, g: Game):
-    \"\"\"Unlock role channels read-only for everyone so you can read the history after the game.\"\"\"
+    """Unlock role channels read-only for everyone so you can read the history after the game."""
     if not channel.guild:
         return
     guild = channel.guild
